@@ -31,7 +31,9 @@ async function getFormattedPriceData() {
     style: 'narrow',
   }).format(minutesSinceUpdate, 'minutes');
 
-  const disclaimer = `Price data provided by ${PRICE_SOURCE_DISCLAIMER} ${relativeTimeSinceLastUpdate}`;
+  const disclaimer = PRICE_SOURCE_DISCLAIMER
+    ? `Price data provided by ${PRICE_SOURCE_DISCLAIMER} ${relativeTimeSinceLastUpdate}`
+    : `Price updated ${relativeTimeSinceLastUpdate}`;
 
   return {
     tokenPrice,
