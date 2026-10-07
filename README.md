@@ -55,7 +55,7 @@ bun start
 
 ### Running under pm2
 
-Prefer having pm2 launch the `bun` binary. `pm2 start index.ts --interpreter bun` also works, but pm2 6 then loads the script through `require()`, which Bun refuses for a module with a top-level `await`: keep `index.ts` free of one, or the bot exits on every start.
+Prefer having pm2 launch the `bun` binary. `pm2 start index.ts --interpreter bun` also works, but pm2 6 then loads the script through `require()`, which Bun refuses for a module with a top-level `await`: keep `index.ts` and every module it imports free of one, or the bot exits on every start.
 
 ```sh
 pm2 start "$(command -v bun)" --name seshbot --cwd /path/to/bot --interpreter none \

@@ -71,8 +71,8 @@ async function registerCommands() {
   }
 }
 
-// Not a top-level await: pm2's Bun loader require()s this file, and Bun refuses that for a
-// module with top-level await.
+// Not a top-level await: pm2's Bun loader require()s this file, and Bun refuses that when any
+// module it imports, directly or not, has a top-level await.
 registerCommands();
 
 // Slash commands and channel.send need only Guilds; no message events means no message content.
