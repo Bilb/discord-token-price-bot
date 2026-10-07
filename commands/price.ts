@@ -23,7 +23,8 @@ async function getFormattedPriceData() {
     roundingMode: 'trunc',
   })} ${TOKEN_SYMBOL}`;
 
-  const minutesSinceUpdate = Math.trunc((priceData.t_stale - Date.now() / 1000) / 60);
+  // t_stale is t_price + 10 min, when the price is due a refresh; it would read as a future time.
+  const minutesSinceUpdate = Math.trunc((priceData.t_price - Date.now() / 1000) / 60);
 
   const relativeTimeSinceLastUpdate = new Intl.RelativeTimeFormat('en-US', {
     numeric: 'auto',
@@ -44,18 +45,18 @@ export const priceCommand = {
   name: 'price',
   description: `Get the price info for ${TOKEN_SYMBOL}`,
   handler: async (interaction) => {
-    const data = await getFormattedPriceData();
-    if (!data) {
-      await interaction.reply('Failed to get price data');
-      return;
-    }
-
     const channelId = interaction.channel?.id;
     if (channelId !== PRICE_CHANNEL_ID) {
       await interaction.reply({
         content: 'This command can only be used in the price channel!',
         flags: 'Ephemeral',
       });
+      return;
+    }
+
+    const data = await getFormattedPriceData();
+    if (!data) {
+      await interaction.reply('Failed to get price data');
       return;
     }
 

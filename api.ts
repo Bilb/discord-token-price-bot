@@ -1,5 +1,5 @@
-import { CACHE_KEY, cache } from './cache.ts';
 import { SESSION_NETWORK_API_URL } from './env.ts';
+import { fetchJson } from './http.ts';
 
 type PriceData = { t_price: number; t_stale: number; usd: number; usd_market_cap: number };
 type NetworkData = {
@@ -27,31 +27,15 @@ export async function getNetworkApiData() {
     return;
   }
 
-  // const cachedNetworkApiData = cache.get<NetworkApiInfoResponse>(CACHE_KEY.NETWORK_API_RESPONSE);
-  // if (cachedNetworkApiData) {
-  //   return cachedNetworkApiData;
-  // }
+  const json = await fetchJson(SESSION_NETWORK_API_URL);
+  if (!json) {
+    return;
+  }
 
-  const response = await fetch(SESSION_NETWORK_API_URL);
-  const json = (await response.json()) as NetworkApiInfoResponse;
-
-  const staleTime = Math.min(Date.now() + 30_000, json.price.t_stale, 5_000);
-
-  cache.set(CACHE_KEY.NETWORK_API_RESPONSE, json, staleTime);
-
-  return json;
+  return json as NetworkApiInfoResponse;
 }
 
-type PriceDataWithCirculatingSupply = PriceData & {
-  circulating_supply: number;
-};
-
 export async function getPriceData() {
-  // const cachedPriceData = cache.get<PriceDataWithCirculatingSupply>(CACHE_KEY.PRICE_DATA);
-  // if (cachedPriceData) {
-  //   return cachedPriceData;
-  // }
-
   const networkApiInfoData = await getNetworkApiData();
 
   if (!networkApiInfoData) {
@@ -64,6 +48,5 @@ export async function getPriceData() {
     circulating_supply: networkApiInfoData.token.circulating_supply,
   };
 
-  cache.setWithExpireTime(CACHE_KEY.PRICE_DATA, priceData, priceData.t_stale * 1000);
   return priceData;
 }

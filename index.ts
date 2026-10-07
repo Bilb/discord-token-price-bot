@@ -101,11 +101,26 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (IGNORE_INVALID_COMMANDS) {
         return;
       }
-      await interaction.reply('Unknown command');
+      await interaction.reply('Unknown command').catch(console.error);
       return;
     }
 
-    return command.handler(interaction);
+    // Bun exits the process on an unhandled rejection, so a failing command must not escape.
+    try {
+      await command.handler(interaction);
+    } catch (error) {
+      console.error(`/${interaction.commandName} failed:`, error);
+      const reply = {
+        content: 'Something went wrong, please try again later.',
+        flags: 'Ephemeral',
+      } as const;
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp(reply).catch(console.error);
+      } else {
+        await interaction.reply(reply).catch(console.error);
+      }
+    }
+    return;
   }
 
   if (interaction.isAutocomplete()) {
@@ -150,10 +165,13 @@ client.once(Events.ClientReady, async (readyClient) => {
 
     // sentNodes starts empty, so the first run after each start announces every currently open node.
     const handleNewOpenNodes = async () => {
-      const { nodes } = await getOpenNodes();
+      const openNodes = await getOpenNodes();
+      if (!openNodes) {
+        return;
+      }
 
       const newNodes = [];
-      for (const node of nodes) {
+      for (const node of openNodes.nodes) {
         if (!sentNodes.has(node.address)) {
           newNodes.push(node);
           sentNodes.add(node.address);
@@ -169,7 +187,9 @@ client.once(Events.ClientReady, async (readyClient) => {
       }
     };
 
-    setInterval(handleNewOpenNodes, 60 * 1000);
+    setInterval(() => {
+      handleNewOpenNodes().catch((error) => console.error('Open-node announcement failed:', error));
+    }, 60 * 1000);
   } catch (err) {
     console.error('Error setting up interval message:', err);
   }

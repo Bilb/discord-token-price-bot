@@ -1,5 +1,5 @@
-import { CACHE_KEY, cache } from './cache.ts';
 import { SESSION_STAKING_PORTAL_URL } from './env.ts';
+import { fetchJson } from './http.ts';
 
 export enum CONTRIBUTION_CONTRACT_STATUS {
   WaitForOperatorContrib = 0,
@@ -27,40 +27,46 @@ export type ContributionContract = {
   status: CONTRIBUTION_CONTRACT_STATUS;
 };
 
-// type OpenNodesData = {
-//   ids: Array<string>;
-//   nodes: Array<ContributionContract>;
-// };
+type OpenNodesData = {
+  ids: Array<string>;
+  nodes: Array<ContributionContract>;
+};
 
-export async function getOpenNodes() {
-  // const cachedData = cache.get<OpenNodesData>(CACHE_KEY.OPEN_NODES);
-  //
-  // if (cachedData) {
-  //   return cachedData;
-  // }
+// `address` goes into links the bot posts, so anything but a contract address is dropped.
+const CONTRACT_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+
+/**
+ * @returns the contracts open for public contribution, or null when the portal can't be reached.
+ */
+export async function getOpenNodes(): Promise<OpenNodesData | null> {
   const url = `${SESSION_STAKING_PORTAL_URL}/api/ssb/contract/contribution`;
 
-  const response = await fetch(url);
-  const jsonResult = await response.json();
+  const jsonResult = (await fetchJson(url)) as { contracts?: unknown } | null;
+  if (!jsonResult) {
+    return null;
+  }
 
-  const openNodes = [];
-  if (jsonResult && Array.isArray(jsonResult.contracts)) {
+  const openNodes: Array<ContributionContract> = [];
+  if (Array.isArray(jsonResult.contracts)) {
     const contractsArray = jsonResult.contracts as Array<ContributionContract>;
 
     for (const item of contractsArray) {
-      if (item.status === CONTRIBUTION_CONTRACT_STATUS.OpenForPublicContrib) {
-        openNodes.push(item);
+      if (item.status !== CONTRIBUTION_CONTRACT_STATUS.OpenForPublicContrib) {
+        continue;
       }
+      if (!CONTRACT_ADDRESS_RE.test(item.address)) {
+        console.warn(
+          `Skipping open contract with unexpected address: ${JSON.stringify(item.address)}`,
+        );
+        continue;
+      }
+      openNodes.push(item);
     }
   }
   const ids = openNodes.map((node) => node.service_node_pubkey);
 
-  const data = {
+  return {
     ids,
     nodes: openNodes,
   };
-
-  cache.set(CACHE_KEY.OPEN_NODES, data, 30_000);
-
-  return data;
 }

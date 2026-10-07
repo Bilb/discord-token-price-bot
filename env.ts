@@ -6,7 +6,9 @@ if (!BOT_TOKEN) throw new Error('BOT_TOKEN is not set');
 const BOT_APP_ID = process.env.BOT_APP_ID!;
 if (!BOT_APP_ID) throw new Error('BOT_APP_ID is not set');
 
-const IGNORE_INVALID_COMMANDS = process.env.IGNORE_INVALID_COMMANDS;
+const IGNORE_INVALID_COMMANDS = ['true', '1'].includes(
+  process.env.IGNORE_INVALID_COMMANDS?.trim().toLowerCase() ?? '',
+);
 
 const SESSION_NETWORK_API_URL = process.env.SESSION_NETWORK_API_URL!;
 if (!SESSION_NETWORK_API_URL)

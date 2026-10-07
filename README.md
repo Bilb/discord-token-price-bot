@@ -18,7 +18,7 @@ Optional:
 
 - `SESSION_NETWORK_API_URL`: The network info API. Without it, `/price` and `/network` do not work.
 - `PRICE_SOURCE_DISCLAIMER`: The name of the source of the price data. eg: "CoinGecko"
-- `IGNORE_INVALID_COMMANDS`: Set to ignore unknown commands rather than respond with "Unknown command". Any non-empty value enables it.
+- `IGNORE_INVALID_COMMANDS`: `true` or `1` to ignore unknown commands rather than respond with "Unknown command".
 - `OPEN_NODES_GUILD_ID`, `OPEN_NODES_CHANNEL_ID`: Server and text channel to announce newly open multicontributor nodes in. Set both or neither; neither disables the announcements.
 
 Discord IDs: enable Developer Mode (User Settings > Advanced), then right-click a server or channel and use "Copy Server ID" / "Copy Channel ID".
