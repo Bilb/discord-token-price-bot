@@ -195,6 +195,6 @@ client.once(Events.ClientReady, async (readyClient) => {
     }
     onOpenNodesRefresh(announceNewOpenNodes);
   } catch (err) {
-    console.error('Error setting up interval message:', err);
+    console.error('Error setting up open-node announcements:', err);
   }
 });

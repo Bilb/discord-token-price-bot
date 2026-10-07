@@ -36,7 +36,7 @@ export type OpenNodesData = {
 const CONTRACT_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
 const REFRESH_INTERVAL_MS = 60_000;
-// The endpoint returns every contract ever made (~10 MB, 4 s+), far past an interaction's 3 s,
+// The endpoint returns every contract ever made, too slow to fetch within an interaction's 3 s,
 // so it is polled in the background. Must stay below REFRESH_INTERVAL_MS so refreshes never overlap.
 const REFRESH_TIMEOUT_MS = 30_000;
 
@@ -76,11 +76,8 @@ async function fetchOpenNodes(): Promise<OpenNodesData | null> {
   };
 }
 
-/**
- * Fetch the open contracts once; on failure the previous snapshot is kept.
- * Exported for tests; the bot calls it through startOpenNodesPolling.
- */
-export async function refreshOpenNodes() {
+// On failure the previous snapshot is kept.
+async function refreshOpenNodes() {
   const openNodes = await fetchOpenNodes();
   if (!openNodes) {
     return;
