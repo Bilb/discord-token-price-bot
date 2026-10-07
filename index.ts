@@ -45,9 +45,6 @@ for (const command of commandToLoad) {
 
 const rest = new REST({ version: '10' }).setToken(BOT_TOKEN);
 
-console.log('Started refreshing application (/) commands.');
-console.log(`Reloading commands: ${Object.keys(commands).join(', ')}`);
-
 const cmd = new SlashCommandBuilder()
   .setName(openNodeCommand.name)
   .setDescription(openNodeCommand.description)
@@ -61,6 +58,9 @@ const cmd = new SlashCommandBuilder()
 
 commandDetails.push(cmd.toJSON());
 commands[openNodeCommand.name] = openNodeCommand;
+
+console.log('Started refreshing application (/) commands.');
+console.log(`Reloading commands: ${Object.keys(commands).join(', ')}`);
 
 async function registerCommands() {
   try {
