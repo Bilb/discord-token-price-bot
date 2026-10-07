@@ -19,7 +19,12 @@ import {
   OPEN_NODES_CHANNEL_ID,
   OPEN_NODES_GUILD_ID,
 } from './env.ts';
-import { type OpenNodesData, onOpenNodesRefresh, startOpenNodesPolling } from './portal.ts';
+import {
+  type OpenNodesData,
+  getOpenNodes,
+  onOpenNodesRefresh,
+  startOpenNodesPolling,
+} from './portal.ts';
 import type { Command, CommandInfo } from './types.ts';
 
 const parseCommandInfo = (command: Command): CommandInfo => {
@@ -157,7 +162,9 @@ client.once(Events.ClientReady, async (readyClient) => {
       return;
     }
 
-    // sentNodes starts empty, so the first refresh after each start announces every currently open node.
+    // Nodes already open at startup are recorded, not posted, so a restart doesn't repost them.
+    // A node that opens while the bot is down is never announced.
+    let seeded = false;
     const announceNewOpenNodes = (openNodes: OpenNodesData) => {
       const newNodes = [];
       for (const node of openNodes.nodes) {
@@ -165,6 +172,11 @@ client.once(Events.ClientReady, async (readyClient) => {
           newNodes.push(node);
           sentNodes.add(node.address);
         }
+      }
+
+      if (!seeded) {
+        seeded = true;
+        return;
       }
 
       for (const node of newNodes) {
@@ -176,6 +188,11 @@ client.once(Events.ClientReady, async (readyClient) => {
       }
     };
 
+    // The first refresh may already have landed while the client was logging in.
+    const current = getOpenNodes();
+    if (current) {
+      announceNewOpenNodes(current);
+    }
     onOpenNodesRefresh(announceNewOpenNodes);
   } catch (err) {
     console.error('Error setting up interval message:', err);
