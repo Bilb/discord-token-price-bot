@@ -19,7 +19,7 @@ import {
   OPEN_NODES_CHANNEL_ID,
   OPEN_NODES_GUILD_ID,
 } from './env.ts';
-import { getOpenNodes } from './portal.ts';
+import { type OpenNodesData, onOpenNodesRefresh, startOpenNodesPolling } from './portal.ts';
 import type { Command, CommandInfo } from './types.ts';
 
 const parseCommandInfo = (command: Command): CommandInfo => {
@@ -130,6 +130,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 client.login(BOT_TOKEN);
+startOpenNodesPolling();
 
 const sentNodes = new Set<string>();
 
@@ -156,13 +157,8 @@ client.once(Events.ClientReady, async (readyClient) => {
       return;
     }
 
-    // sentNodes starts empty, so the first run after each start announces every currently open node.
-    const handleNewOpenNodes = async () => {
-      const openNodes = await getOpenNodes();
-      if (!openNodes) {
-        return;
-      }
-
+    // sentNodes starts empty, so the first refresh after each start announces every currently open node.
+    const announceNewOpenNodes = (openNodes: OpenNodesData) => {
       const newNodes = [];
       for (const node of openNodes.nodes) {
         if (!sentNodes.has(node.address)) {
@@ -180,9 +176,7 @@ client.once(Events.ClientReady, async (readyClient) => {
       }
     };
 
-    setInterval(() => {
-      handleNewOpenNodes().catch((error) => console.error('Open-node announcement failed:', error));
-    }, 60 * 1000);
+    onOpenNodesRefresh(announceNewOpenNodes);
   } catch (err) {
     console.error('Error setting up interval message:', err);
   }

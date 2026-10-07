@@ -27,7 +27,7 @@ export type ContributionContract = {
   status: CONTRIBUTION_CONTRACT_STATUS;
 };
 
-type OpenNodesData = {
+export type OpenNodesData = {
   ids: Array<string>;
   nodes: Array<ContributionContract>;
 };
@@ -35,13 +35,18 @@ type OpenNodesData = {
 // `address` goes into links the bot posts, so anything but a contract address is dropped.
 const CONTRACT_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 
-/**
- * @returns the contracts open for public contribution, or null when the portal can't be reached.
- */
-export async function getOpenNodes(): Promise<OpenNodesData | null> {
+const REFRESH_INTERVAL_MS = 60_000;
+// The endpoint returns every contract ever made (~10 MB, 4 s+), far past an interaction's 3 s,
+// so it is polled in the background. Must stay below REFRESH_INTERVAL_MS so refreshes never overlap.
+const REFRESH_TIMEOUT_MS = 30_000;
+
+let snapshot: OpenNodesData | null = null;
+const refreshListeners: Array<(openNodes: OpenNodesData) => void> = [];
+
+async function fetchOpenNodes(): Promise<OpenNodesData | null> {
   const url = `${SESSION_STAKING_PORTAL_URL}/api/ssb/contract/contribution`;
 
-  const jsonResult = (await fetchJson(url)) as { contracts?: unknown } | null;
+  const jsonResult = (await fetchJson(url, REFRESH_TIMEOUT_MS)) as { contracts?: unknown } | null;
   if (!jsonResult) {
     return null;
   }
@@ -69,4 +74,49 @@ export async function getOpenNodes(): Promise<OpenNodesData | null> {
     ids,
     nodes: openNodes,
   };
+}
+
+/**
+ * Fetch the open contracts once; on failure the previous snapshot is kept.
+ * Exported for tests; the bot calls it through startOpenNodesPolling.
+ */
+export async function refreshOpenNodes() {
+  const openNodes = await fetchOpenNodes();
+  if (!openNodes) {
+    return;
+  }
+
+  snapshot = openNodes;
+  for (const listener of refreshListeners) {
+    try {
+      listener(openNodes);
+    } catch (error) {
+      console.error('Open-node refresh listener failed:', error);
+    }
+  }
+}
+
+/**
+ * Refresh the open contracts now, then every minute. Never throws.
+ */
+export function startOpenNodesPolling() {
+  const tick = () => {
+    refreshOpenNodes().catch((error) => console.error('Open-node refresh failed:', error));
+  };
+  tick();
+  setInterval(tick, REFRESH_INTERVAL_MS);
+}
+
+/**
+ * @returns the latest successfully fetched open contracts, or null before the first success.
+ */
+export function getOpenNodes(): OpenNodesData | null {
+  return snapshot;
+}
+
+/**
+ * Call `listener` after every successful refresh.
+ */
+export function onOpenNodesRefresh(listener: (openNodes: OpenNodesData) => void) {
+  refreshListeners.push(listener);
 }

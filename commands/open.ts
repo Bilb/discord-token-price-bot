@@ -94,7 +94,7 @@ export const openNodeCommand = {
   handleAutocomplete: async (interaction) => {
     const focusedValue = interaction.options.getFocused();
 
-    const ids = (await getOpenNodes())?.ids ?? [];
+    const ids = getOpenNodes()?.ids ?? [];
 
     const filtered = ids.filter((choice) => choice.startsWith(focusedValue)).slice(0, 24);
     await interaction.respond(filtered.map((choice) => ({ name: choice, value: choice })));
@@ -109,7 +109,7 @@ export const openNodeCommand = {
       return;
     }
 
-    const openNodes = await getOpenNodes();
+    const openNodes = getOpenNodes();
     if (!openNodes) {
       await interaction.reply({ content: 'Failed to get open nodes', flags: 'Ephemeral' });
       return;

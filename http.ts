@@ -3,11 +3,15 @@ const FETCH_TIMEOUT_MS = 2_500;
 
 /**
  * Fetch and parse a JSON endpoint.
+ * @param timeoutMs - defaults to a budget that fits an interaction reply.
  * @returns the parsed body, or null on a network error, timeout, non-2xx status or invalid JSON.
  */
-export async function fetchJson(url: string): Promise<unknown | null> {
+export async function fetchJson(
+  url: string,
+  timeoutMs = FETCH_TIMEOUT_MS,
+): Promise<unknown | null> {
   try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+    const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
     if (!response.ok) {
       console.warn(`${url} returned HTTP ${response.status}`);
       return null;
