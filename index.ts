@@ -65,13 +65,8 @@ try {
   console.error(error);
 }
 
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-  ],
-});
+// Slash commands and channel.send need only Guilds; no message events means no message content.
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 client.on(Events.ClientReady, (readyClient) => {
   console.log(`Logged in as ${readyClient.user.tag}!`);
@@ -91,8 +86,6 @@ client.on(Events.ClientReady, (readyClient) => {
     client.user.setPresence({ activities: [stakingActivity], status: 'online' });
   }
 });
-
-// client.on(Events.MessageCreate, async (message) => {});
 
 client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isChatInputCommand()) {

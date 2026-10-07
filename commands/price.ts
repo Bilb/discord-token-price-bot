@@ -45,8 +45,7 @@ export const priceCommand = {
   name: 'price',
   description: `Get the price info for ${TOKEN_SYMBOL}`,
   handler: async (interaction) => {
-    const channelId = interaction.channel?.id;
-    if (channelId !== PRICE_CHANNEL_ID) {
+    if (interaction.channelId !== PRICE_CHANNEL_ID) {
       await interaction.reply({
         content: 'This command can only be used in the price channel!',
         flags: 'Ephemeral',

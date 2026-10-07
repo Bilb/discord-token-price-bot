@@ -21,6 +21,8 @@ Optional:
 - `IGNORE_INVALID_COMMANDS`: `true` or `1` to ignore unknown commands rather than respond with "Unknown command".
 - `OPEN_NODES_GUILD_ID`, `OPEN_NODES_CHANNEL_ID`: Server and text channel to announce newly open multicontributor nodes in. Set both or neither; neither disables the announcements.
 
+Discord app setup: leave every Privileged Gateway Intent off; the bot reads no messages. It needs no server permissions for the slash commands, and View Channel, Send Messages and Embed Links in the announcement channel only.
+
 Discord IDs: enable Developer Mode (User Settings > Advanced), then right-click a server or channel and use "Copy Server ID" / "Copy Channel ID".
 
 ## Commands
