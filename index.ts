@@ -45,30 +45,35 @@ for (const command of commandToLoad) {
 
 const rest = new REST({ version: '10' }).setToken(BOT_TOKEN);
 
-try {
-  console.log('Started refreshing application (/) commands.');
-  console.log(`Reloading commands: ${Object.keys(commands).join(', ')}`);
+console.log('Started refreshing application (/) commands.');
+console.log(`Reloading commands: ${Object.keys(commands).join(', ')}`);
 
-  const cmd = new SlashCommandBuilder()
-    .setName(openNodeCommand.name)
-    .setDescription(openNodeCommand.description)
-    .addStringOption((option) =>
-      option
-        .setName('id')
-        .setDescription('Open Node Ed25519 Key (ID)')
-        .setAutocomplete(true)
-        .setRequired(true),
-    );
+const cmd = new SlashCommandBuilder()
+  .setName(openNodeCommand.name)
+  .setDescription(openNodeCommand.description)
+  .addStringOption((option) =>
+    option
+      .setName('id')
+      .setDescription('Open Node Ed25519 Key (ID)')
+      .setAutocomplete(true)
+      .setRequired(true),
+  );
 
-  commandDetails.push(cmd.toJSON());
-  commands[openNodeCommand.name] = openNodeCommand;
+commandDetails.push(cmd.toJSON());
+commands[openNodeCommand.name] = openNodeCommand;
 
-  await rest.put(Routes.applicationCommands(BOT_APP_ID), { body: commandDetails });
-
-  console.log('Successfully reloaded application (/) commands.');
-} catch (error) {
-  console.error(error);
+async function registerCommands() {
+  try {
+    await rest.put(Routes.applicationCommands(BOT_APP_ID), { body: commandDetails });
+    console.log('Successfully reloaded application (/) commands.');
+  } catch (error) {
+    console.error(error);
+  }
 }
+
+// Not a top-level await: pm2's Bun loader require()s this file, and Bun refuses that for a
+// module with top-level await.
+registerCommands();
 
 // Slash commands and channel.send need only Guilds; no message events means no message content.
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
