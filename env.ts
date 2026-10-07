@@ -20,6 +20,16 @@ if (!TOKEN_SYMBOL) throw new Error('TOKEN_SYMBOL is not set');
 
 const PRICE_SOURCE_DISCLAIMER = process.env.PRICE_SOURCE_DISCLAIMER;
 
+// biome-ignore lint/style/noNonNullAssertion: This is fine
+const PRICE_CHANNEL_ID = process.env.PRICE_CHANNEL_ID!;
+if (!PRICE_CHANNEL_ID) throw new Error('PRICE_CHANNEL_ID is not set');
+
+// Both unset disables the open-node announcements; only one set is a typo, not a choice.
+const OPEN_NODES_GUILD_ID = process.env.OPEN_NODES_GUILD_ID;
+const OPEN_NODES_CHANNEL_ID = process.env.OPEN_NODES_CHANNEL_ID;
+if (!OPEN_NODES_GUILD_ID !== !OPEN_NODES_CHANNEL_ID)
+  throw new Error('OPEN_NODES_GUILD_ID and OPEN_NODES_CHANNEL_ID must be set together');
+
 export {
   BOT_TOKEN,
   BOT_APP_ID,
@@ -28,4 +38,7 @@ export {
   SESSION_STAKING_PORTAL_URL,
   TOKEN_SYMBOL,
   PRICE_SOURCE_DISCLAIMER,
+  PRICE_CHANNEL_ID,
+  OPEN_NODES_GUILD_ID,
+  OPEN_NODES_CHANNEL_ID,
 };

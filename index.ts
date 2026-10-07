@@ -12,7 +12,13 @@ import { githubCommand } from './commands/github.ts';
 import { networkCommand } from './commands/network.ts';
 import { createOpenContractMessage, openNodeCommand } from './commands/open.ts';
 import { priceCommand } from './commands/price.ts';
-import { BOT_APP_ID, BOT_TOKEN, IGNORE_INVALID_COMMANDS } from './env.ts';
+import {
+  BOT_APP_ID,
+  BOT_TOKEN,
+  IGNORE_INVALID_COMMANDS,
+  OPEN_NODES_CHANNEL_ID,
+  OPEN_NODES_GUILD_ID,
+} from './env.ts';
 import { getOpenNodes } from './portal.ts';
 import type { Command, CommandInfo } from './types.ts';
 
@@ -117,29 +123,32 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
 client.login(BOT_TOKEN);
 
-const GUILD_ID = '1163265397408149564';
-const CHANNEL_ID = '1380399036020035624';
-const CHANNEL_ID_GM = '1226773647025504287'
-
 const sentNodes = new Set<string>();
 
 client.once(Events.ClientReady, async (readyClient) => {
+  if (!OPEN_NODES_GUILD_ID || !OPEN_NODES_CHANNEL_ID) {
+    console.log(
+      'Open-node announcements disabled: OPEN_NODES_GUILD_ID / OPEN_NODES_CHANNEL_ID not set',
+    );
+    return;
+  }
+
   try {
-    // 1. Fetch the guild by ID
-    const guild = await readyClient.guilds.fetch(GUILD_ID);
+    const guild = await readyClient.guilds.fetch(OPEN_NODES_GUILD_ID);
     if (!guild) {
-      console.error(`❌ Could not find guild ${GUILD_ID}`);
+      console.error(`❌ Could not find guild ${OPEN_NODES_GUILD_ID}`);
       return;
     }
 
-    // 2. Fetch the channel by ID (cast to TextChannel)
-    const channel = await guild.channels.fetch(CHANNEL_ID);
+    const channel = await guild.channels.fetch(OPEN_NODES_CHANNEL_ID);
     if (!channel || !(channel instanceof TextChannel)) {
-      console.error(`❌ Could not find text channel ${CHANNEL_ID} in guild ${GUILD_ID}`);
+      console.error(
+        `❌ Could not find text channel ${OPEN_NODES_CHANNEL_ID} in guild ${OPEN_NODES_GUILD_ID}`,
+      );
       return;
     }
 
-    // 3. Immediately send a message, then schedule every 10 minutes
+    // sentNodes starts empty, so the first run after each start announces every currently open node.
     const handleNewOpenNodes = async () => {
       const { nodes } = await getOpenNodes();
 
@@ -160,7 +169,6 @@ client.once(Events.ClientReady, async (readyClient) => {
       }
     };
 
-    // Schedule it to run every 1 minute
     setInterval(handleNewOpenNodes, 60 * 1000);
   } catch (err) {
     console.error('Error setting up interval message:', err);

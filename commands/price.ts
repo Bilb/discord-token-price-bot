@@ -1,5 +1,5 @@
 import { getPriceData } from '../api.ts';
-import { PRICE_SOURCE_DISCLAIMER, TOKEN_SYMBOL } from '../env.ts';
+import { PRICE_CHANNEL_ID, PRICE_SOURCE_DISCLAIMER, TOKEN_SYMBOL } from '../env.ts';
 import type { Command } from '../types.ts';
 
 async function getFormattedPriceData() {
@@ -51,7 +51,7 @@ export const priceCommand = {
     }
 
     const channelId = interaction.channel?.id;
-    if (channelId !== '1241930807124430858') {
+    if (channelId !== PRICE_CHANNEL_ID) {
       await interaction.reply({
         content: 'This command can only be used in the price channel!',
         flags: 'Ephemeral',
