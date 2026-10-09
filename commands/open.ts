@@ -16,6 +16,10 @@ const collapseString = (str: string, leadingChars = 6, trailingChars = 4): strin
   return `${str.slice(0, leadingChars)}…${str.slice(-trailingChars)}`;
 };
 
+// Contract amounts are in atomic units: 1 SESH = 10^9.
+const STAKING_REQUIREMENT = 25_000 * 10 ** 9;
+const MAX_CONTRIBUTORS = 10;
+
 const formatSESH = (value: number) => {
   return `${(value / 10 ** 9).toLocaleString('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 0 })} ${TOKEN_SYMBOL}`;
 };
@@ -27,7 +31,7 @@ export function createOpenContractEmbed(contract: ContributionContract, descript
   );
 
   const contributorField = {
-    name: `Contributors (${contract.contributors.length}/10)`,
+    name: `Contributors (${contract.contributors.length}/${MAX_CONTRIBUTORS})`,
     value: contributorStrings.join('\n'),
   };
 
@@ -41,7 +45,7 @@ export function createOpenContractEmbed(contract: ContributionContract, descript
     totalStaked += contributor.amount || contributor.reserved;
   }
 
-  const remainingStakeFormatted = formatSESH(25_000_000000000 - totalStaked);
+  const remainingStakeFormatted = formatSESH(STAKING_REQUIREMENT - totalStaked);
 
   const fields = [
     contributorField,
@@ -90,9 +94,9 @@ export const openNodeCommand = {
   handleAutocomplete: async (interaction) => {
     const focusedValue = interaction.options.getFocused();
 
-    const { ids } = await getOpenNodes();
+    const ids = getOpenNodes()?.ids ?? [];
 
-    const filtered = ids.filter((choice) => choice.startsWith(focusedValue)).slice(0,24);
+    const filtered = ids.filter((choice) => choice.startsWith(focusedValue)).slice(0, 24);
     await interaction.respond(filtered.map((choice) => ({ name: choice, value: choice })));
   },
   handler: async (interaction) => {
@@ -105,8 +109,13 @@ export const openNodeCommand = {
       return;
     }
 
-    const { nodes } = await getOpenNodes();
-    const contract = nodes.find((node) => node.service_node_pubkey === id);
+    const openNodes = getOpenNodes();
+    if (!openNodes) {
+      await interaction.reply({ content: 'Failed to get open nodes', flags: 'Ephemeral' });
+      return;
+    }
+
+    const contract = openNodes.nodes.find((node) => node.service_node_pubkey === id);
 
     if (!contract) {
       await interaction.reply('Open node not found!');

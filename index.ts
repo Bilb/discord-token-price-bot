@@ -12,8 +12,19 @@ import { githubCommand } from './commands/github.ts';
 import { networkCommand } from './commands/network.ts';
 import { createOpenContractMessage, openNodeCommand } from './commands/open.ts';
 import { priceCommand } from './commands/price.ts';
-import { BOT_APP_ID, BOT_TOKEN, IGNORE_INVALID_COMMANDS } from './env.ts';
-import { getOpenNodes } from './portal.ts';
+import {
+  BOT_APP_ID,
+  BOT_TOKEN,
+  IGNORE_INVALID_COMMANDS,
+  OPEN_NODES_CHANNEL_ID,
+  OPEN_NODES_GUILD_ID,
+} from './env.ts';
+import {
+  type OpenNodesData,
+  getOpenNodes,
+  onOpenNodesRefresh,
+  startOpenNodesPolling,
+} from './portal.ts';
 import type { Command, CommandInfo } from './types.ts';
 
 const parseCommandInfo = (command: Command): CommandInfo => {
@@ -34,38 +45,38 @@ for (const command of commandToLoad) {
 
 const rest = new REST({ version: '10' }).setToken(BOT_TOKEN);
 
-try {
-  console.log('Started refreshing application (/) commands.');
-  console.log(`Reloading commands: ${Object.keys(commands).join(', ')}`);
+const cmd = new SlashCommandBuilder()
+  .setName(openNodeCommand.name)
+  .setDescription(openNodeCommand.description)
+  .addStringOption((option) =>
+    option
+      .setName('id')
+      .setDescription('Open Node Ed25519 Key (ID)')
+      .setAutocomplete(true)
+      .setRequired(true),
+  );
 
-  const cmd = new SlashCommandBuilder()
-    .setName(openNodeCommand.name)
-    .setDescription(openNodeCommand.description)
-    .addStringOption((option) =>
-      option
-        .setName('id')
-        .setDescription('Open Node Ed25519 Key (ID)')
-        .setAutocomplete(true)
-        .setRequired(true),
-    );
+commandDetails.push(cmd.toJSON());
+commands[openNodeCommand.name] = openNodeCommand;
 
-  commandDetails.push(cmd.toJSON());
-  commands[openNodeCommand.name] = openNodeCommand;
+console.log('Started refreshing application (/) commands.');
+console.log(`Reloading commands: ${Object.keys(commands).join(', ')}`);
 
-  await rest.put(Routes.applicationCommands(BOT_APP_ID), { body: commandDetails });
-
-  console.log('Successfully reloaded application (/) commands.');
-} catch (error) {
-  console.error(error);
+async function registerCommands() {
+  try {
+    await rest.put(Routes.applicationCommands(BOT_APP_ID), { body: commandDetails });
+    console.log('Successfully reloaded application (/) commands.');
+  } catch (error) {
+    console.error(error);
+  }
 }
 
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-  ],
-});
+// Not a top-level await: pm2's Bun loader require()s this file, and Bun refuses that when any
+// module it imports, directly or not, has a top-level await.
+registerCommands();
+
+// Slash commands and channel.send need only Guilds; no message events means no message content.
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 client.on(Events.ClientReady, (readyClient) => {
   console.log(`Logged in as ${readyClient.user.tag}!`);
@@ -86,8 +97,6 @@ client.on(Events.ClientReady, (readyClient) => {
   }
 });
 
-// client.on(Events.MessageCreate, async (message) => {});
-
 client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isChatInputCommand()) {
     const command = commands[interaction.commandName];
@@ -95,11 +104,26 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (IGNORE_INVALID_COMMANDS) {
         return;
       }
-      await interaction.reply('Unknown command');
+      await interaction.reply('Unknown command').catch(console.error);
       return;
     }
 
-    return command.handler(interaction);
+    // Bun exits the process on an unhandled rejection, so a failing command must not escape.
+    try {
+      await command.handler(interaction);
+    } catch (error) {
+      console.error(`/${interaction.commandName} failed:`, error);
+      const reply = {
+        content: 'Something went wrong, please try again later.',
+        flags: 'Ephemeral',
+      } as const;
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp(reply).catch(console.error);
+      } else {
+        await interaction.reply(reply).catch(console.error);
+      }
+    }
+    return;
   }
 
   if (interaction.isAutocomplete()) {
@@ -116,39 +140,48 @@ client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 client.login(BOT_TOKEN);
-
-const GUILD_ID = '1163265397408149564';
-const CHANNEL_ID = '1380399036020035624';
-const CHANNEL_ID_GM = '1226773647025504287'
+startOpenNodesPolling();
 
 const sentNodes = new Set<string>();
 
 client.once(Events.ClientReady, async (readyClient) => {
+  if (!OPEN_NODES_GUILD_ID || !OPEN_NODES_CHANNEL_ID) {
+    console.log(
+      'Open-node announcements disabled: OPEN_NODES_GUILD_ID / OPEN_NODES_CHANNEL_ID not set',
+    );
+    return;
+  }
+
   try {
-    // 1. Fetch the guild by ID
-    const guild = await readyClient.guilds.fetch(GUILD_ID);
+    const guild = await readyClient.guilds.fetch(OPEN_NODES_GUILD_ID);
     if (!guild) {
-      console.error(`❌ Could not find guild ${GUILD_ID}`);
+      console.error(`❌ Could not find guild ${OPEN_NODES_GUILD_ID}`);
       return;
     }
 
-    // 2. Fetch the channel by ID (cast to TextChannel)
-    const channel = await guild.channels.fetch(CHANNEL_ID);
+    const channel = await guild.channels.fetch(OPEN_NODES_CHANNEL_ID);
     if (!channel || !(channel instanceof TextChannel)) {
-      console.error(`❌ Could not find text channel ${CHANNEL_ID} in guild ${GUILD_ID}`);
+      console.error(
+        `❌ Could not find text channel ${OPEN_NODES_CHANNEL_ID} in guild ${OPEN_NODES_GUILD_ID}`,
+      );
       return;
     }
 
-    // 3. Immediately send a message, then schedule every 10 minutes
-    const handleNewOpenNodes = async () => {
-      const { nodes } = await getOpenNodes();
-
+    // Nodes already open at startup are recorded, not posted, so a restart doesn't repost them.
+    // A node that opens while the bot is down is never announced.
+    let seeded = false;
+    const announceNewOpenNodes = (openNodes: OpenNodesData) => {
       const newNodes = [];
-      for (const node of nodes) {
+      for (const node of openNodes.nodes) {
         if (!sentNodes.has(node.address)) {
           newNodes.push(node);
           sentNodes.add(node.address);
         }
+      }
+
+      if (!seeded) {
+        seeded = true;
+        return;
       }
 
       for (const node of newNodes) {
@@ -160,9 +193,13 @@ client.once(Events.ClientReady, async (readyClient) => {
       }
     };
 
-    // Schedule it to run every 1 minute
-    setInterval(handleNewOpenNodes, 60 * 1000);
+    // The first refresh may already have landed while the client was logging in.
+    const current = getOpenNodes();
+    if (current) {
+      announceNewOpenNodes(current);
+    }
+    onOpenNodesRefresh(announceNewOpenNodes);
   } catch (err) {
-    console.error('Error setting up interval message:', err);
+    console.error('Error setting up open-node announcements:', err);
   }
 });
